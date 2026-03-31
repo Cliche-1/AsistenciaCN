@@ -95,11 +95,68 @@ namespace AsistenciaApi.Controllers
 
             return BadRequest(new { message = "Tipo de operación no válida." });
         }
+
+        // Endpoint para modificar un registro existente desde el panel Editar Asistencias
+        [HttpPut("records/{id}")]
+        public async Task<IActionResult> UpdateRecord(int id, [FromBody] UpdateRecordRequest request)
+        {
+            var record = await _context.AttendanceRecords.FindAsync(id);
+            if (record == null) return NotFound(new { message = "Registro no encontrado." });
+
+            if (TimeSpan.TryParse(request.InTime, out var inTime)) record.InTime = inTime;
+            if (TimeSpan.TryParse(request.OutTime, out var outTime)) record.OutTime = outTime;
+            if (!string.IsNullOrEmpty(request.Status)) record.Status = request.Status;
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Registro modificado exitosamente." });
+        }
+
+        // Endpoint para registrar una asistencia antigua/manual
+        [HttpPost("manual")]
+        public async Task<IActionResult> RegisterManual([FromBody] ManualAttendanceRequest request)
+        {
+            var worker = await _context.Workers.FirstOrDefaultAsync(w => w.Dni == request.Dni);
+            if (worker == null) return NotFound(new { message = "Trabajador no encontrado." });
+
+            if (!DateTime.TryParse(request.Date, out var date))
+                return BadRequest(new { message = "Formato de fecha inválido." });
+
+            var record = new AttendanceRecord
+            {
+                WorkerId = worker.Id,
+                Date = date,
+                Status = request.Status
+            };
+
+            if (TimeSpan.TryParse(request.InTime, out var inTime)) record.InTime = inTime;
+            if (TimeSpan.TryParse(request.OutTime, out var outTime)) record.OutTime = outTime;
+
+            _context.AttendanceRecords.Add(record);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Asistencia agregada correctamente." });
+        }
     }
 
     public class MarkRequest
     {
         public string Dni { get; set; }
         public string Type { get; set; } // "ENTRADA" o "SALIDA"
+    }
+
+    public class UpdateRecordRequest
+    {
+        public string InTime { get; set; }
+        public string OutTime { get; set; }
+        public string Status { get; set; }
+    }
+
+    public class ManualAttendanceRequest
+    {
+        public string Dni { get; set; }
+        public string Date { get; set; }
+        public string InTime { get; set; }
+        public string OutTime { get; set; }
+        public string Status { get; set; }
     }
 }

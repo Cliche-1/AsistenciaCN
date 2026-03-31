@@ -1,13 +1,28 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Filter, FileSpreadsheet, Search } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { API_URL } from '../api';
 
 export default function AdminRecords() {
-  const [records] = useState([
-    { id: 1, name: 'Juan Pérez', dni: '12345678', date: new Date().toLocaleDateString('es-ES'), in: '08:00', out: '17:05', status: 'A tiempo' },
-    { id: 2, name: 'María Gomez', dni: '87654321', date: new Date().toLocaleDateString('es-ES'), in: '08:15', out: '17:10', status: 'Tarde' },
-    { id: 3, name: 'Carlos López', dni: '11223344', date: new Date().toLocaleDateString('es-ES'), in: '--:--', out: '--:--', status: 'Falta' },
-  ]);
+  const [records, setRecords] = useState([]);
+
+  useEffect(() => {
+    fetch(`${API_URL}/attendance/records`)
+      .then(res => res.json())
+      .then(data => {
+         const mapped = data.map(d => ({
+            id: d.id,
+            name: d.workerName,
+            dni: d.workerDni,
+            date: d.date,
+            in: d.inTime,
+            out: d.outTime,
+            status: d.status
+         }));
+         setRecords(mapped);
+      })
+      .catch(err => console.error(err));
+  }, []);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');

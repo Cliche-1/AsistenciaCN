@@ -1,19 +1,44 @@
-import { useState } from 'react';
-import { Search, Edit2, Save, X, UserSearch } from 'lucide-react';
-import { workers } from '../mocks/data';
-
-const mockRecords = [
-  { id: 1, workerId: 1, date: new Date().toLocaleDateString('es-ES'), in: '08:00', out: '17:05', status: 'A tiempo' },
-  { id: 2, workerId: 1, date: '30/03/2026', in: '08:15', out: '17:10', status: 'Tarde' },
-  { id: 3, workerId: 2, date: new Date().toLocaleDateString('es-ES'), in: '08:05', out: '17:00', status: 'A tiempo' },
-];
+import { useState, useEffect } from 'react';
+import { Search, Edit2, Save, X, UserSearch, Plus } from 'lucide-react';
+import { API_URL } from '../api';
 
 export default function AdminEditRecords() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedWorker, setSelectedWorker] = useState(null);
-  const [records, setRecords] = useState(mockRecords);
+  const [records, setRecords] = useState([]);
+  const [workers, setWorkers] = useState([]);
   const [editingRecordId, setEditingRecordId] = useState(null);
   const [editForm, setEditForm] = useState({ in: '', out: '', status: '' });
+  
+  // Añadir registro manual
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [addForm, setAddForm] = useState({ date: '', in: '', out: '', status: 'A tiempo' });
+  const [isAdding, setIsAdding] = useState(false);
+
+  const fetchData = () => {
+    fetch(`${API_URL}/workers`)
+      .then(r => r.json())
+      .then(d => setWorkers(d))
+      .catch(err => console.error(err));
+      
+    fetch(`${API_URL}/attendance/records`)
+      .then(r => r.json())
+      .then(d => {
+        setRecords(d.map(item => ({
+         id: item.id,
+         workerId: item.workerId,
+         date: item.date,
+         in: item.inTime === '--:--' ? '' : item.inTime,
+         out: item.outTime === '--:--' ? '' : item.outTime,
+         status: item.status
+        })));
+      })
+      .catch(err => console.error(err));
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const suggestedWorkers = searchTerm.length > 1 
     ? workers.filter(w => w.name.toLowerCase().includes(searchTerm.toLowerCase()) || w.dni.includes(searchTerm))
@@ -33,19 +58,75 @@ export default function AdminEditRecords() {
     setEditingRecordId(null);
   };
 
-  const saveEditing = (id) => {
-    setRecords(records.map(r => r.id === id ? { ...r, ...editForm } : r));
-    setEditingRecordId(null);
+  const saveEditing = async (id) => {
+    try {
+      const response = await fetch(`${API_URL}/attendance/records/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+           inTime: editForm.in,
+           outTime: editForm.out,
+           status: editForm.status
+        })
+      });
+      
+      if (response.ok) {
+        setRecords(records.map(r => r.id === id ? { ...r, ...editForm } : r));
+        setEditingRecordId(null);
+      } else {
+        alert("Error al guardar en la base de datos");
+      }
+    } catch(err) {
+      console.error(err);
+      alert("Error de conexión al guardar");
+    }
+  };
+
+  const handleAddSubmit = async (e) => {
+    e.preventDefault();
+    setIsAdding(true);
+    
+    // Formatear date a dd/MM/yyyy porque el backend actual (C# DateTime.Parse) lo va a recibir mejor en formato universal 
+    // o dependiendo del CultureInfo o parsearlo directamente. Pero como el input type date devuelve AAAA-MM-DD
+    const isoDate = addForm.date;
+
+    try {
+      const response = await fetch(`${API_URL}/attendance/manual`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+           dni: selectedWorker.dni,
+           date: isoDate,
+           inTime: addForm.in,
+           outTime: addForm.out,
+           status: addForm.status
+        })
+      });
+      
+      if (response.ok) {
+        setIsAddModalOpen(false);
+        setAddForm({ date: '', in: '', out: '', status: 'A tiempo' });
+        fetchData(); // Refrescar todo
+      } else {
+        const errorData = await response.json();
+        alert(errorData.message || "Error al agregar registro manual");
+      }
+    } catch(err) {
+      console.error(err);
+      alert("Error de conexión");
+    } finally {
+      setIsAdding(false);
+    }
   };
 
   const workerRecords = records.filter(r => selectedWorker && r.workerId === selectedWorker.id);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-dark-900">Modificar Asistencias</h1>
-          <p className="text-gray-500 mt-1">Busca a un trabajador para editar sus horas registradas.</p>
+          <h1 className="text-2xl font-bold text-dark-900">Modificar y Agregar Asistencias</h1>
+          <p className="text-gray-500 mt-1">Busca a un trabajador para editar o agregar sus horas manualmente.</p>
         </div>
       </div>
 
@@ -80,7 +161,7 @@ export default function AdminEditRecords() {
 
         {selectedWorker ? (
           <div className="animate-fade-in-up">
-            <div className="flex items-center justify-between mb-6 pb-6 border-b border-gray-100">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-6 border-b border-gray-100">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 bg-gradient-to-br from-primary-100 to-primary-200 text-primary-700 rounded-full flex items-center justify-center font-black text-2xl uppercase shadow-inner">
                   {selectedWorker.name.charAt(0)}
@@ -94,9 +175,20 @@ export default function AdminEditRecords() {
                   </div>
                 </div>
               </div>
-              <button onClick={() => setSelectedWorker(null)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-sm font-bold transition-colors">
-                Cambiar
-              </button>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-bold transition-colors shadow-sm flex items-center gap-2"
+                >
+                  <Plus size={16} /> Agregar Asistencia
+                </button>
+                <button 
+                  onClick={() => setSelectedWorker(null)} 
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-sm font-bold transition-colors"
+                >
+                  Cambiar
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto rounded-xl border border-gray-200">
@@ -118,14 +210,14 @@ export default function AdminEditRecords() {
                         {editingRecordId === r.id ? (
                           <input type="time" value={editForm.in} onChange={e => setEditForm({...editForm, in: e.target.value})} className="px-3 py-1.5 border border-primary-300 rounded-lg text-sm w-32 focus:ring-2 focus:ring-primary-500 focus:outline-none shadow-sm" />
                         ) : (
-                          <span className="bg-gray-100 border border-gray-200 px-3 py-1 rounded-md text-gray-700 font-mono text-sm font-semibold">{r.in}</span>
+                          <span className="bg-gray-100 border border-gray-200 px-3 py-1 rounded-md text-gray-700 font-mono text-sm font-semibold">{r.in || '--:--'}</span>
                         )}
                       </td>
                       <td className="px-5 py-4 text-center">
                         {editingRecordId === r.id ? (
                           <input type="time" value={editForm.out} onChange={e => setEditForm({...editForm, out: e.target.value})} className="px-3 py-1.5 border border-primary-300 rounded-lg text-sm w-32 focus:ring-2 focus:ring-primary-500 focus:outline-none shadow-sm" />
                         ) : (
-                          <span className="bg-gray-100 border border-gray-200 px-3 py-1 rounded-md text-gray-700 font-mono text-sm font-semibold">{r.out}</span>
+                          <span className="bg-gray-100 border border-gray-200 px-3 py-1 rounded-md text-gray-700 font-mono text-sm font-semibold">{r.out || '--:--'}</span>
                         )}
                       </td>
                       <td className="px-5 py-4">
@@ -179,6 +271,85 @@ export default function AdminEditRecords() {
           </div>
         )}
       </div>
+
+      {/* Modal Add record */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 animate-fade-in-up">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in-up">
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="text-lg font-bold text-dark-900">Registrar Asistencia Manual</h3>
+              <button onClick={() => setIsAddModalOpen(false)} className="text-gray-400 hover:text-gray-600 p-1">
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleAddSubmit} className="p-6 space-y-4 shadow-inner">
+              
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Fecha de Marcación</label>
+                <input 
+                  type="date" 
+                  required
+                  value={addForm.date}
+                  onChange={e => setAddForm({...addForm, date: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                />
+              </div>
+
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Entrada</label>
+                  <input 
+                    type="time" 
+                    value={addForm.in}
+                    onChange={e => setAddForm({...addForm, in: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Salida</label>
+                  <input 
+                    type="time" 
+                    value={addForm.out}
+                    onChange={e => setAddForm({...addForm, out: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Estado de Asistencia</label>
+                <select 
+                  value={addForm.status}
+                  onChange={e => setAddForm({...addForm, status: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none cursor-pointer"
+                >
+                  <option value="A tiempo">A tiempo</option>
+                  <option value="Tarde">Tarde</option>
+                  <option value="Falta">Falta</option>
+                </select>
+                <p className="text-xs text-gray-400 mt-2">Puede dejar la hora en blanco si el empleado olvidó marcar la salida o entrada.</p>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-3 border-t border-gray-100 mt-4">
+                <button 
+                  type="button" 
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="px-4 py-3 text-gray-600 font-semibold rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isAdding || !addForm.date}
+                  className="px-6 py-3 bg-primary-600 text-white font-bold rounded-lg hover:bg-primary-500 disabled:opacity-50 transition-colors flex items-center gap-2"
+                >
+                  {isAdding ? 'Registrando...' : 'Confirmar Asistencia'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

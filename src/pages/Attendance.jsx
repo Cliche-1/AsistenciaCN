@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Clock, UserCheck, UserMinus, ShieldAlert } from 'lucide-react';
-import { workers } from '../mocks/data';
+import { API_URL } from '../api';
 
 export default function Attendance() {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -21,25 +21,35 @@ export default function Attendance() {
 
   const isDniValid = dni.length === 8;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isDniValid) return;
 
     setLoading(true);
     setMessage(null);
 
-    setTimeout(() => {
-      setLoading(false);
-      const worker = workers.find(w => w.dni === dni);
-      if (worker) {
-        setMessage({ type: 'success', text: `¡${type} registrada para ${worker.name}!` });
+    try {
+      const response = await fetch(`${API_URL}/attendance/mark`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dni, type })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage({ type: 'success', text: data.message });
       } else {
-        setMessage({ type: 'error', text: 'DNI no encontrado en el sistema.' });
+        setMessage({ type: 'error', text: data.message || 'Error al registrar.' });
       }
       setDni('');
-      
-      setTimeout(() => setMessage(null), 3000);
-    }, 1200);
+    } catch (error) {
+      console.error(error);
+      setMessage({ type: 'error', text: 'Error de conexión con el servidor local.' });
+    } finally {
+      setLoading(false);
+      setTimeout(() => setMessage(null), 4000);
+    }
   };
 
   return (
