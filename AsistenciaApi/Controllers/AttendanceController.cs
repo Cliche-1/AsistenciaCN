@@ -39,6 +39,30 @@ namespace AsistenciaApi.Controllers
             return Ok(records);
         }
 
+        // Historial de un trabajador especifico
+        [HttpGet("records/worker/{workerId}")]
+        public async Task<ActionResult<IEnumerable<object>>> GetRecordsByWorker(int workerId)
+        {
+            var records = await _context.AttendanceRecords
+                .Include(r => r.Worker)
+                .Where(r => r.WorkerId == workerId)
+                .Select(r => new {
+                    r.Id,
+                    WorkerId = r.WorkerId,
+                    WorkerName = r.Worker.Name,
+                    WorkerDni = r.Worker.Dni,
+                    WorkerArea = r.Worker.Area,
+                    Date = r.Date.ToString("dd/MM/yyyy"),
+                    InTime = r.InTime.HasValue ? r.InTime.Value.ToString(@"hh\:mm") : "--:--",
+                    OutTime = r.OutTime.HasValue ? r.OutTime.Value.ToString(@"hh\:mm") : "--:--",
+                    Status = r.Status
+                })
+                .OrderByDescending(r => r.Id)
+                .ToListAsync();
+
+            return Ok(records);
+        }
+
         // Principal para Kiosco
         [HttpPost("mark")]
         public async Task<IActionResult> MarkAttendance([FromBody] MarkRequest request)
@@ -66,14 +90,14 @@ namespace AsistenciaApi.Controllers
                         WorkerId = worker.Id,
                         Date = today,
                         InTime = currentTime,
-                        Status = currentTime.Hours >= 9 ? "Tarde" : "A tiempo" // Despues de 9am es tarde
+                        Status = currentTime > new TimeSpan(7, 35, 0) ? "Tardanza" : "A tiempo" // Después de 7:35am es tardanza
                     };
                     _context.AttendanceRecords.Add(record);
                 }
                 else
                 {
                     record.InTime = currentTime;
-                    record.Status = currentTime.Hours >= 9 ? "Tarde" : "A tiempo";
+                    record.Status = currentTime > new TimeSpan(7, 35, 0) ? "Tardanza" : "A tiempo";
                 }
 
                 await _context.SaveChangesAsync();

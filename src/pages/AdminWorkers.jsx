@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Search, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, X, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { API_URL } from '../api';
 
 export default function AdminWorkers() {
@@ -59,6 +60,36 @@ export default function AdminWorkers() {
     }
   };
 
+  const handleExportWorker = async (worker) => {
+    try {
+      const res = await fetch(`${API_URL}/attendance/records/worker/${worker.id}`);
+      if (!res.ok) throw new Error("Error al obtener registros");
+      const data = await res.json();
+      
+      if (data.length === 0) {
+        alert("Este trabajador no tiene registros de asistencia.");
+        return;
+      }
+
+      const worksheet = XLSX.utils.json_to_sheet(data.map(r => ({
+        'Trabajador': r.workerName,
+        'DNI': r.workerDni,
+        'Área': r.workerArea,
+        'Fecha': r.date,
+        'Hora de Entrada': r.inTime,
+        'Hora de Salida': r.outTime,
+        'Estado': r.status,
+      })));
+      
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Asistencias");
+      XLSX.writeFile(workbook, `Asistencias_${worker.name.replace(/\s+/g, '_')}_${worker.dni}.xlsx`);
+    } catch (err) {
+      console.error(err);
+      alert("Error al exportar los registros.");
+    }
+  };
+
   return (
     <div className="space-y-6 relative">
       <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
@@ -114,10 +145,17 @@ export default function AdminWorkers() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right space-x-2">
-                    <button className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
+                    <button 
+                      onClick={() => handleExportWorker(w)}
+                      title="Exportar Asistencias"
+                      className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                    >
+                      <FileSpreadsheet size={18} />
+                    </button>
+                    <button title="Editar Trabajador" className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
                       <Edit2 size={18} />
                     </button>
-                    <button className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                    <button title="Eliminar Trabajador" className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                       <Trash2 size={18} />
                     </button>
                   </td>

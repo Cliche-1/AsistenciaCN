@@ -152,10 +152,6 @@ export default function Attendance() {
           </div>
         </div>
       </div>
-      
-      <a href="/login" className="absolute bottom-6 text-primary-400/60 text-sm hover:text-dark-900 transition-colors font-semibold tracking-wider uppercase">
-        Acceso Administrador
-      </a>
     </div>
   );
 }

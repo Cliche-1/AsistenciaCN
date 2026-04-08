@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
+  --color-primary-50: #f8fafc;
+  --color-primary-100: #e2e8f0;
+  --color-primary-500: #475569;
+  --color-primary-600: #334155;
+  --color-primary-700: #1e293b;
   
-  --color-dark-800: #1e293b;
-  --color-dark-900: #0f172a;
+  --color-dark-800: #0f172a;
+  --color-dark-900: #020617;
 
   --animate-fade-in-up: fade-in-up 0.3s ease-out forwards;
   
@@ -26,7 +26,7 @@
 
 @layer base {
   body {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
     background-color: var(--color-primary-50);
     color: var(--color-dark-900);
   }

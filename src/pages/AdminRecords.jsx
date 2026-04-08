@@ -1,10 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Filter, FileSpreadsheet, Search } from 'lucide-react';
+import { Filter, FileSpreadsheet, Search, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { API_URL } from '../api';
 
 export default function AdminRecords() {
   const [records, setRecords] = useState([]);
+
+  // Export Modal State
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportType, setExportType] = useState('all'); // 'all' or 'specific'
+  const [exportStartDate, setExportStartDate] = useState('');
+  const [exportEndDate, setExportEndDate] = useState('');
+  const [exportWorkerId, setExportWorkerId] = useState('');
 
   useEffect(() => {
     fetch(`${API_URL}/attendance/records`)
@@ -48,8 +55,32 @@ export default function AdminRecords() {
     return true;
   });
 
-  const handleExport = () => {
-    const worksheet = XLSX.utils.json_to_sheet(filteredRecords.map(r => ({
+  const handleGenerateExport = () => {
+    if (exportType === 'specific' && !exportWorkerId) {
+      alert("Por favor, seleccione un trabajador.");
+      return;
+    }
+
+    const dataToExport = records.filter(r => {
+      // 1. Filtrar por trabajador específico
+      if (exportType === 'specific' && r.dni !== exportWorkerId) return false;
+
+      // 2. Filtrar por rango de fechas
+      const [day, month, year] = r.date.split('/');
+      if (day && month && year) {
+        const isoRecordDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        if (exportStartDate && isoRecordDate < exportStartDate) return false;
+        if (exportEndDate && isoRecordDate > exportEndDate) return false;
+      }
+      return true;
+    });
+
+    if (dataToExport.length === 0) {
+      alert("No hay registros para exportar con estos filtros.");
+      return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport.map(r => ({
       'Trabajador': r.name,
       'DNI': r.dni,
       'Fecha': r.date,
@@ -59,7 +90,15 @@ export default function AdminRecords() {
     })));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Asistencias");
-    XLSX.writeFile(workbook, `Reporte_Asistencias.xlsx`);
+    
+    const workerNameForFile = exportType === 'specific' 
+      ? dataToExport[0].name.replace(/\s+/g, '_') 
+      : 'Todos';
+
+    const filename = `Asistencias_${workerNameForFile}_${exportStartDate || 'Inicio'}_al_${exportEndDate || 'Fin'}.xlsx`;
+
+    XLSX.writeFile(workbook, filename);
+    setIsExportModalOpen(false);
   };
 
   return (
@@ -70,11 +109,11 @@ export default function AdminRecords() {
           <p className="text-gray-500 mt-1">Historial detallado y reportes exportables.</p>
         </div>
         <button 
-          onClick={handleExport}
+          onClick={() => setIsExportModalOpen(true)}
           className="bg-green-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-green-500 hover:shadow-lg transition-all whitespace-nowrap"
         >
           <FileSpreadsheet size={18} />
-          Exportar Excel ({filteredRecords.length})
+          Exportar Excel
         </button>
       </div>
 
@@ -105,7 +144,7 @@ export default function AdminRecords() {
              >
                <option value="Todos">Todos los Estados</option>
                <option value="A tiempo">A tiempo</option>
-               <option value="Tarde">Tarde</option>
+               <option value="Tardanza">Tardanza</option>
                <option value="Falta">Falta</option>
              </select>
 
@@ -172,7 +211,7 @@ export default function AdminRecords() {
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase ${
                         r.status === 'A tiempo' ? 'bg-green-100 text-green-800' : 
-                        r.status === 'Tarde' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                        r.status === 'Tardanza' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
                       }`}>
                         {r.status}
                       </span>
@@ -190,6 +229,95 @@ export default function AdminRecords() {
           </table>
         </div>
       </div>
+      {/* Export Modal */}
+      {isExportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 animate-fade-in-up">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in-up">
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="text-lg font-bold text-dark-900 flex items-center gap-2">
+                <FileSpreadsheet className="text-green-600" size={20} />
+                Exportar Reporte
+              </h3>
+              <button onClick={() => setIsExportModalOpen(false)} className="text-gray-400 hover:text-gray-600 p-1">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-5">
+              <div className="space-y-3">
+                <label className="block text-sm font-semibold text-gray-700">Tipo de Reporte a Exportar</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button 
+                    onClick={() => setExportType('all')}
+                    className={`px-4 py-3 rounded-xl border text-sm font-bold flex items-center justify-center transition-all ${exportType === 'all' ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    Todos
+                  </button>
+                  <button 
+                    onClick={() => setExportType('specific')}
+                    className={`px-4 py-3 rounded-xl border text-sm font-bold flex items-center justify-center transition-all ${exportType === 'specific' ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    Exclusivo
+                  </button>
+                </div>
+              </div>
+
+              {exportType === 'specific' && (
+                <div className="animate-fade-in-up">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Seleccionar Trabajador</label>
+                  <select 
+                    value={exportWorkerId}
+                    onChange={e => setExportWorkerId(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                  >
+                    <option value="">-- Seleccione un trabajador --</option>
+                    {Array.from(new Map(records.map(r => [r.dni, { name: r.name, dni: r.dni }])).values()).map(w => (
+                      <option key={w.dni} value={w.dni}>{w.name} ({w.dni})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Desde (Opcional)</label>
+                  <input 
+                    type="date"
+                    value={exportStartDate}
+                    onChange={e => setExportStartDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Hasta (Opcional)</label>
+                  <input 
+                    type="date"
+                    value={exportEndDate}
+                    onChange={e => setExportEndDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-600"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+              <button 
+                onClick={() => setIsExportModalOpen(false)}
+                className="px-4 py-2 text-gray-600 font-semibold rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleGenerateExport}
+                className="px-6 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-500 transition-colors flex items-center gap-2"
+              >
+                <FileSpreadsheet size={18} />
+                Descargar Excel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

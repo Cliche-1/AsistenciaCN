@@ -224,13 +224,13 @@ export default function AdminEditRecords() {
                         {editingRecordId === r.id ? (
                           <select value={editForm.status} onChange={e => setEditForm({...editForm, status: e.target.value})} className="px-3 py-1.5 border border-primary-300 rounded-lg text-sm min-w-[120px] focus:ring-2 focus:ring-primary-500 focus:outline-none shadow-sm cursor-pointer">
                             <option value="A tiempo">A tiempo</option>
-                            <option value="Tarde">Tarde</option>
+                            <option value="Tardanza">Tardanza</option>
                             <option value="Falta">Falta</option>
                           </select>
                         ) : (
                           <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase ${
                             r.status === 'A tiempo' ? 'bg-green-100 text-green-800' : 
-                            r.status === 'Tarde' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                            r.status === 'Tardanza' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
                           }`}>
                             {r.status}
                           </span>
@@ -324,7 +324,7 @@ export default function AdminEditRecords() {
                   className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none cursor-pointer"
                 >
                   <option value="A tiempo">A tiempo</option>
-                  <option value="Tarde">Tarde</option>
+                  <option value="Tardanza">Tardanza</option>
                   <option value="Falta">Falta</option>
                 </select>
                 <p className="text-xs text-gray-400 mt-2">Puede dejar la hora en blanco si el empleado olvidó marcar la salida o entrada.</p>
