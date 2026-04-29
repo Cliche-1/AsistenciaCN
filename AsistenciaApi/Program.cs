@@ -20,8 +20,11 @@ builder.Services.AddCors(options =>
         });
 });
 
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+    ?? builder.Configuration["DefaultConnection"];
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(connectionString));
 
 var app = builder.Build();
 
@@ -41,6 +44,17 @@ app.UseCors("AllowVite");
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapGet("/api/health", async (AppDbContext db) => {
+    try {
+        bool canConnect = await db.Database.CanConnectAsync();
+        return canConnect 
+            ? Results.Ok("Conexión a la Base de Datos: EXITOSA.") 
+            : Results.Problem("La conexión falló pero no se arrojó una excepción.");
+    } catch (Exception ex) {
+        return Results.Problem("Error conectando a DB: " + ex.Message + " | Inner: " + ex.InnerException?.Message);
+    }
+});
 
 app.MapFallbackToFile("index.html");
 
