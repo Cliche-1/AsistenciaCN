@@ -47,12 +47,11 @@ app.MapControllers();
 
 app.MapGet("/api/health", async (AppDbContext db) => {
     try {
-        bool canConnect = await db.Database.CanConnectAsync();
-        return canConnect 
-            ? Results.Ok("Conexión a la Base de Datos: EXITOSA.") 
-            : Results.Problem("La conexión falló pero no se arrojó una excepción.");
+        await db.Database.OpenConnectionAsync();
+        await db.Database.CloseConnectionAsync();
+        return Results.Ok("Conexión a la Base de Datos: EXITOSA.");
     } catch (Exception ex) {
-        return Results.Problem("Error conectando a DB: " + ex.Message + " | Inner: " + ex.InnerException?.Message);
+        return Results.Problem("Error detallado: " + ex.Message + " | Inner: " + ex.InnerException?.Message);
     }
 });
 
