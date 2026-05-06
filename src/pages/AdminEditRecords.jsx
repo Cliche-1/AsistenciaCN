@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Edit2, Save, X, UserSearch, Plus } from 'lucide-react';
+import { Search, Edit2, Save, X, UserSearch, Plus, Trash2 } from 'lucide-react';
 import { API_URL } from '../api';
 
 export default function AdminEditRecords() {
@@ -79,6 +79,21 @@ export default function AdminEditRecords() {
     } catch(err) {
       console.error(err);
       alert("Error de conexión al guardar");
+    }
+  };
+
+  const handleDeleteRecord = async (id) => {
+    if (!window.confirm("¿Está seguro de eliminar esta asistencia? Esta acción no se puede deshacer.")) return;
+    try {
+      const response = await fetch(`${API_URL}/attendance/records/${id}`, { method: 'DELETE' });
+      if (response.ok) {
+        setRecords(records.filter(r => r.id !== id));
+      } else {
+        alert("Error al eliminar la asistencia");
+      }
+    } catch(err) {
+      console.error(err);
+      alert("Error de conexión al eliminar");
     }
   };
 
@@ -247,9 +262,14 @@ export default function AdminEditRecords() {
                             </button>
                           </div>
                         ) : (
-                          <button onClick={() => startEditing(r)} className="p-2 text-primary-600 bg-primary-50 hover:bg-primary-100 hover:text-primary-700 rounded-lg transition-colors flex items-center gap-2 font-bold text-xs uppercase" title="Modificar">
-                            <Edit2 size={14} /> Editar
-                          </button>
+                          <div className="flex gap-2 justify-end">
+                            <button onClick={() => startEditing(r)} className="p-2 text-primary-600 bg-primary-50 hover:bg-primary-100 hover:text-primary-700 rounded-lg transition-colors flex items-center gap-2 font-bold text-xs uppercase" title="Modificar">
+                              <Edit2 size={14} /> Editar
+                            </button>
+                            <button onClick={() => handleDeleteRecord(r.id)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700 rounded-lg transition-colors flex items-center font-bold text-xs uppercase" title="Eliminar">
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>

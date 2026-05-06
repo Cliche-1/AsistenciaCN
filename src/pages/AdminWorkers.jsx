@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Search, X, FileSpreadsheet } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import { Plus, Edit2, Trash2, Search, X } from 'lucide-react';
 import { API_URL } from '../api';
 
 export default function AdminWorkers() {
@@ -9,6 +8,7 @@ export default function AdminWorkers() {
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingWorkerId, setEditingWorkerId] = useState(null);
   const [formData, setFormData] = useState({ name: '', dni: '', area: '', status: 'Activo' });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -28,29 +28,42 @@ export default function AdminWorkers() {
     w.dni.includes(searchTerm)
   );
 
-  const handleOpenModal = () => {
-    setFormData({ name: '', dni: '', area: '', status: 'Activo' });
+  const handleOpenModal = (worker = null) => {
+    if (worker) {
+      setEditingWorkerId(worker.id);
+      setFormData({ name: worker.name, dni: worker.dni, area: worker.area, status: worker.status });
+    } else {
+      setEditingWorkerId(null);
+      setFormData({ name: '', dni: '', area: '', status: 'Activo' });
+    }
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    setEditingWorkerId(null);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
+    
+    const isEditing = editingWorkerId !== null;
+    const url = isEditing ? `${API_URL}/workers/${editingWorkerId}` : `${API_URL}/workers`;
+    const method = isEditing ? 'PUT' : 'POST';
+    const payload = isEditing ? { ...formData, id: editingWorkerId } : formData;
+
     try {
-      const response = await fetch(`${API_URL}/workers`, {
-        method: 'POST',
+      const response = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
       if (response.ok) {
         handleCloseModal();
         fetchWorkers(); // Refresh data
       } else {
-        alert("Error al guardar trabajador");
+        alert(isEditing ? "Error al editar trabajador" : "Error al guardar trabajador");
       }
     } catch (err) {
       console.error(err);
@@ -60,33 +73,23 @@ export default function AdminWorkers() {
     }
   };
 
-  const handleExportWorker = async (worker) => {
-    try {
-      const res = await fetch(`${API_URL}/attendance/records/worker/${worker.id}`);
-      if (!res.ok) throw new Error("Error al obtener registros");
-      const data = await res.json();
-      
-      if (data.length === 0) {
-        alert("Este trabajador no tiene registros de asistencia.");
-        return;
-      }
+  const handleDelete = async (id) => {
+    if (!window.confirm('¿Está seguro de eliminar a este trabajador? (Al eliminarlo también se pueden borrar sus registros de asistencia)')) {
+      return;
+    }
 
-      const worksheet = XLSX.utils.json_to_sheet(data.map(r => ({
-        'Trabajador': r.workerName,
-        'DNI': r.workerDni,
-        'Área': r.workerArea,
-        'Fecha': r.date,
-        'Hora de Entrada': r.inTime,
-        'Hora de Salida': r.outTime,
-        'Estado': r.status,
-      })));
-      
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Asistencias");
-      XLSX.writeFile(workbook, `Asistencias_${worker.name.replace(/\s+/g, '_')}_${worker.dni}.xlsx`);
+    try {
+      const response = await fetch(`${API_URL}/workers/${id}`, {
+        method: 'DELETE'
+      });
+      if (response.ok) {
+        fetchWorkers();
+      } else {
+        alert("Error al eliminar trabajador");
+      }
     } catch (err) {
       console.error(err);
-      alert("Error al exportar los registros.");
+      alert("Error de conexión");
     }
   };
 
@@ -98,7 +101,7 @@ export default function AdminWorkers() {
           <p className="text-gray-500 mt-1">Administra el talento humano de la empresa.</p>
         </div>
         <button 
-          onClick={handleOpenModal}
+          onClick={() => handleOpenModal()}
           className="bg-primary-600 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 hover:bg-primary-500 hover:shadow-lg transition-all"
         >
           <Plus size={18} />
@@ -146,16 +149,17 @@ export default function AdminWorkers() {
                   </td>
                   <td className="px-6 py-4 text-right space-x-2">
                     <button 
-                      onClick={() => handleExportWorker(w)}
-                      title="Exportar Asistencias"
-                      className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                      onClick={() => handleOpenModal(w)}
+                      className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                      title="Editar"
                     >
-                      <FileSpreadsheet size={18} />
-                    </button>
-                    <button title="Editar Trabajador" className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
                       <Edit2 size={18} />
                     </button>
-                    <button title="Eliminar Trabajador" className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                    <button 
+                      onClick={() => handleDelete(w.id)}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Eliminar"
+                    >
                       <Trash2 size={18} />
                     </button>
                   </td>
@@ -178,7 +182,7 @@ export default function AdminWorkers() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 animate-fade-in-up">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in-up">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-              <h3 className="text-lg font-bold text-dark-900">Crear Nuevo Trabajador</h3>
+              <h3 className="text-lg font-bold text-dark-900">{editingWorkerId ? 'Editar Trabajador' : 'Crear Nuevo Trabajador'}</h3>
               <button onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600 p-1">
                 <X size={20} />
               </button>
@@ -218,6 +222,19 @@ export default function AdminWorkers() {
                   placeholder="Ej. Sistemas"
                 />
               </div>
+              {editingWorkerId && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Estado</label>
+                  <select 
+                    value={formData.status}
+                    onChange={e => setFormData({...formData, status: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none cursor-pointer"
+                  >
+                    <option value="Activo">Activo</option>
+                    <option value="Inactivo">Inactivo</option>
+                  </select>
+                </div>
+              )}
               <div className="pt-2 flex justify-end gap-3">
                 <button 
                   type="button" 

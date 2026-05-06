@@ -160,6 +160,19 @@ namespace AsistenciaApi.Controllers
 
             return Ok(new { message = "Asistencia agregada correctamente." });
         }
+
+        // Endpoint para eliminar un registro de asistencia
+        [HttpDelete("records/{id}")]
+        public async Task<IActionResult> DeleteRecord(int id)
+        {
+            var record = await _context.AttendanceRecords.FindAsync(id);
+            if (record == null) return NotFound(new { message = "Registro no encontrado." });
+
+            _context.AttendanceRecords.Remove(record);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Registro eliminado exitosamente." });
+        }
     }
 
     public class MarkRequest
